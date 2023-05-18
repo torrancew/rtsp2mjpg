@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - run: |
+        apt-get update
+        apt-get -y install qemu-user-static
     - id: build_image
       name: Build Image
       uses: redhat-actions/buildah-build@v2
