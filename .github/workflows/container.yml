@@ -11,6 +11,7 @@ permissions:
 
 
 env:
+  IMAGE_NAME: ${{ github.repository }}
   IMAGE_TAGS: latest ${{ github.ref_name }} ${{ github.sha }}
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
   REGISTRY_USERNAME: ${{ github.actor }}
@@ -25,7 +26,7 @@ jobs:
       name: Build Image
       uses: redhat-actions/buildah-build@v2
       with:
-        image: ${{ env.GITHUB_REPOSITORY }}
+        image: ${{ env.IMAGE_NAME }}
         platforms: linux/amd64, linux/arm64
         tags: ${{ env.IMAGE_TAG }}
         containerfiles: |
