@@ -25,7 +25,7 @@ jobs:
       name: Build Image
       uses: redhat-actions/buildah-build@v2
       with:
-        image: ${{ env.GITHUB_REPOSITORY) }}
+        image: ${{ env.GITHUB_REPOSITORY }}
         platforms: linux/amd64, linux/arm64
         tags: ${{ env.IMAGE_TAG }}
         containerfiles: |
