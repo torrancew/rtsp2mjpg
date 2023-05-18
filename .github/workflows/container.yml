@@ -2,6 +2,7 @@ name: Container Images
 
 on:
   push:
+    branches: [ "develop", "main" ]
     tags: [ "v*" ]
 
 permissions:
@@ -30,6 +31,7 @@ jobs:
         containerfiles: |
           ./Containerfile
     - id: push_image
+      if: github.ref_type == 'tag'
       name: Push Image to GHCR
       uses: redhat-actions/push-to-registry@v2
       with:
