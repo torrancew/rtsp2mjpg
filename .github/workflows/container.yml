@@ -10,7 +10,7 @@ permissions:
 
 
 env:
-  IMAGE_TAGS: latest 
+  IMAGE_TAGS: latest ${{ github.ref_name }} ${{ github.sha }}
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
   REGISTRY_USERNAME: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ github.token }}
@@ -31,7 +31,7 @@ jobs:
           ./Containerfile
     - id: push_image
       name: Push Image to GHCR
-      uses: redhat-actions/push-to-registry
+      uses: redhat-actions/push-to-registry@v2
       with:
         image: ${{ steps.build_image.outputs.image }}
         tags: ${{ steps.build_image.outputs.tags }}
