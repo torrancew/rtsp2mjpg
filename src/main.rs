@@ -1,5 +1,7 @@
 mod mjpeg;
-use mjpeg::{Stream, StreamError};
+use mjpeg::Process;
+
+use std::sync::Arc;
 
 use async_stream::stream;
 use axum::{extract::State, response::IntoResponse, routing::get, Router, Server};
@@ -41,14 +43,13 @@ struct Args {
     stream: String,
 }
 
-async fn stream(State(mut stream): State<Stream>) -> impl IntoResponse {
+async fn stream(State(stream): State<Arc<Process>>) -> impl IntoResponse {
     use axum::{
         body::StreamBody,
         http::{header, StatusCode},
     };
 
-    use StreamError::*;
-
+    let mut stream = stream.subscribe();
     (
         StatusCode::OK,
         [
@@ -63,7 +64,7 @@ async fn stream(State(mut stream): State<Stream>) -> impl IntoResponse {
 
             loop {
                 match stream.next_frame().await {
-                    Err(Stream(_)) => continue,
+                    Err(_) => continue,
                     x => yield x.map(Bytes::from),
                 }
             }
@@ -76,11 +77,11 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let transcoder = Stream::new(args.stream, args.fps, args.buffer)?;
+    let transcoder = Arc::new(Process::new(args.stream, args.fps, args.buffer)?);
     let app = Router::new()
         .route("/", get(stream))
         .layer(tower_http::trace::TraceLayer::new_for_http())
-        .with_state(transcoder.clone());
+        .with_state(transcoder);
 
     let addr = format!("{}:{}", args.listen_addr, args.port);
     info!("Listening on {addr}");

@@ -1,11 +1,14 @@
-use super::frame::{Frame, FrameError, FrameReader};
+use super::{
+    frame::{Frame, FrameError, FrameReader},
+    Stream,
+};
 
-use std::{ffi::OsStr, io, process::Stdio};
+use std::{io, process::Stdio};
 
 use thiserror::Error;
 use tokio::{
     process::{Child, Command},
-    sync::broadcast::{error::SendError, Receiver, Sender},
+    sync::broadcast::{error::SendError, Sender},
     task::JoinHandle,
 };
 
@@ -30,16 +33,33 @@ pub(crate) struct Process {
 }
 
 impl Process {
-    pub fn new<S: AsRef<OsStr>>(
-        cmd: impl AsRef<OsStr>,
-        args: impl IntoIterator<Item = S>,
-        channel: Sender<Frame>,
+    pub fn new(
+        source: impl AsRef<str>,
+        fps: usize,
+        buffer_secs: usize,
     ) -> Result<Self, ProcessError> {
-        let mut process = Command::new(cmd)
-            .args(args)
+        let buffered_frames = fps * buffer_secs;
+        let (channel, _) = tokio::sync::broadcast::channel(buffered_frames);
+        let mut process = Command::new("ffmpeg")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .kill_on_drop(false)
+            .kill_on_drop(true)
+            .args([
+                "-i",
+                source.as_ref(),
+                "-c:v",
+                "mjpeg",
+                "-q:v",
+                "1",
+                "-f",
+                "mpjpeg",
+                "-filter_complex",
+                &format!("[0:v] fps={fps}"),
+                "-fps_mode",
+                "drop",
+                "-an",
+                "-",
+            ])
             .spawn()?;
 
         let mut reader = process
@@ -49,7 +69,7 @@ impl Process {
             .map(FrameReader::new)?;
 
         let tx = channel.clone();
-        let handle: JoinHandle<Result<(), ProcessError>> = tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             // Discard the leading MIME boundary before looping over the incoming frames
             reader.discard_mime_boundary().await?;
 
@@ -59,10 +79,10 @@ impl Process {
             loop {
                 match reader.read_frame().await {
                     Err(FrameError::Corrupt) => continue,
-                    Ok(frame) => match tx.send(frame) {
-                        Ok(_) => continue,
-                        Err(e) => return Err(ProcessError::from(e)),
-                    },
+                    Ok(frame) => {
+                        let _ = tx.send(frame);
+                        continue;
+                    }
                     Err(e) => return Err(ProcessError::from(e)),
                 }
             }
@@ -75,7 +95,7 @@ impl Process {
         })
     }
 
-    pub fn subscribe(&self) -> Receiver<Frame> {
-        self.channel.subscribe()
+    pub fn subscribe(&self) -> Stream {
+        Stream(self.channel.subscribe())
     }
 }
