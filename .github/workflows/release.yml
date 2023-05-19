@@ -1,23 +1,16 @@
 name: Release Artifacts
 
-permissions:
-  contents: read
-  packages: none
-
 on:
   push:
     branches: [ "develop", "main" ]
     tags: [ "v*" ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 permissions:
   contents: read
   packages: write
 
-
 env:
+  CARGO_TERM_COLOR: always
   IMAGE_NAME: ${{ github.repository }}
   IMAGE_TAGS: latest ${{ github.ref_name }} ${{ github.sha }}
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
