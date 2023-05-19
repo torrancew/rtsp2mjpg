@@ -3,6 +3,7 @@ use mjpeg::{Stream, StreamError};
 
 use async_stream::stream;
 use axum::{extract::State, response::IntoResponse, routing::get, Router, Server};
+use bytes::Bytes;
 use clap::Parser;
 use tracing::info;
 
@@ -58,10 +59,12 @@ async fn stream(State(mut stream): State<Stream>) -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-cache"),
         ],
         StreamBody::new(stream! {
+            yield Ok(Bytes::from("--ffmpeg\r\n"));
+
             loop {
                 match stream.next_frame().await {
                     Err(Stream(_)) => continue,
-                    x => yield x,
+                    x => yield x.map(Bytes::from),
                 }
             }
         }),
