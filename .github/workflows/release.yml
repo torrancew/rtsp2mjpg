@@ -56,6 +56,7 @@ jobs:
       with:
         name: rtsp2mjpg-${{ matrix.arch }}
         path: target/${{ env.TARGET }}/release/rtsp2mjpg
+
   container_images:
     name: Build Container Images
     runs-on: ubuntu-latest
@@ -82,6 +83,12 @@ jobs:
           type=semver,pattern={{major.minor}}
           type=semver,pattern={{major}}
           type=sha
+    - name: Authenticate to Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     - name: Build Container
       uses: docker/build-push-action@v4
       with:
