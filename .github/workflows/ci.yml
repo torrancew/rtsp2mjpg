@@ -25,6 +25,13 @@ jobs:
       TARGET: ${{ matrix.arch }}-unknown-linux-musl
     steps:
     - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        override: true
+        target: ${{ env.TARGET }}
+        toolchain: stable
+        components: clippy
     - uses: actions/cache@v3
       with:
         key: ${{ env.TARGET }}-cargo-${{ hashFiles('**/Cargo.lock') }}-ci
@@ -34,13 +41,6 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        override: true
-        target: ${{ env.TARGET }}
-        toolchain: stable
-        components: clippy
     - uses: actions-rs/cargo@v1
       with:
         use-cross: true

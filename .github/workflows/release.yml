@@ -27,6 +27,13 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y qemu-user-static
+    - name: Install Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        override: true
+        target: ${{ env.TARGET }}
+        toolchain: stable
     - name: Cache Build Artifacts
       uses: actions/cache@v3
       with:
@@ -37,13 +44,6 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-    - name: Install Rust Toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        override: true
-        target: ${{ env.TARGET }}
-        toolchain: stable
     - name: Compile
       uses: actions-rs/cargo@v1
       with:
@@ -82,7 +82,7 @@ jobs:
       uses: redhat-actions/buildah-build@v2
       with:
         image: ${{ env.IMAGE_NAME }}
-        platforms: linux/amd64, linux/arm64
+        platforms: linux/arm64
         tags: ${{ env.IMAGE_TAGS }}
         containerfiles: |
           ./Containerfile
