@@ -66,33 +66,26 @@ jobs:
       REGISTRY_USERNAME: ${{ github.actor }}
       REGISTRY_PASSWORD: ${{ github.token }}
     steps:
-    - uses: actions/checkout@v3
-    - name: Cache Container Layers
-      uses: actions/cache@v3
-      with:
-        key: buildah-${{ hashFiles('**/Containerfile') }}-release
-        path: |
-          ~/.local/share/containers
     - name: Install QEMU
-      run: |
-        sudo apt-get update
-        sudo apt-get -y install qemu-user-static
-    - id: build_image
-      name: Build Image
-      uses: redhat-actions/buildah-build@v2
+      uses: docker/setup-qemu-action@v2
+    - name: Install BuildX
+      uses: docker/setup-buildx-action@v2
+    - id: metadata
+      name: Configure Container Metadata
+      uses: docker/metadata-action@v4
       with:
-        image: ${{ env.IMAGE_NAME }}
-        platforms: linux/arm64
-        tags: ${{ env.IMAGE_TAGS }}
-        containerfiles: |
-          ./Containerfile
-    - id: push_image
-      if: github.ref_type == 'tag'
-      name: Push Image to Registry
-      uses: redhat-actions/push-to-registry@v2
+        images: |
+          ghcr.io/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major.minor}}
+          type=semver,pattern={{major}}
+          type=sha
+    - name: Build Container
+      uses: docker/build-push-action@v4
       with:
-        image: ${{ steps.build_image.outputs.image }}
-        tags: ${{ steps.build_image.outputs.tags }}
-        registry: ${{ env.IMAGE_REGISTRY }}
-        username: ${{ env.REGISTRY_USERNAME }}
-        password: ${{ env.REGISTRY_PASSWORD }}
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.ref_type == 'tag' }}
+        tags: ${{ steps.metadata.outputs.tags }}
+        labels: ${{ steps.metadata.output.labels }}
