@@ -128,7 +128,7 @@ jobs:
     - name: Download Per-Arch Container Images
       uses: actions/download-artifact@v3
       with:
-        name: rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar
+        name: rtsp2mjpg-*.tar
     - name: Display Downloaded Archites
       run: |
         ls -R
