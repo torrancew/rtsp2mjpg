@@ -96,7 +96,7 @@ jobs:
           ./Containerfile
     - name: Export Container
       run: |
-        podman image save --quiet -o rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar ${{ steps.build_image.outputs.image-with-tag }
+        podman image save --quiet -o rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar ${{ steps.build_image.outputs.image-with-tag }}
     - name: Upload Binaries
       uses: actions/upload-artifact@v3
       with:
