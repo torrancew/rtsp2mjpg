@@ -88,6 +88,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: rtsp2mjpg.${{ steps.extract_arch.outputs.rs_arch }}
+        path: ./rtsp2mjpg.${{ steps.extract_arch.outputs.rs_arch }}
     - name: Build Container
       id: build_image
       uses: redhat-actions/buildah-build@v2
@@ -127,7 +128,7 @@ jobs:
     - name: Download Per-Arch Container Images
       uses: actions/download-artifact@v3
       with:
-        name: rtsp2mjpg-${{ steps.extract_arch.outputs.rs_arch }}
+        name: rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar
     - name: Display Downloaded Archites
       run: |
         ls -R
