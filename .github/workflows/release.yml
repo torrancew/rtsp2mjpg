@@ -89,7 +89,6 @@ jobs:
       with:
         image: ${{ env.IMAGE_NAME }}
         tags: ${{ steps.extract_arch.outputs.oci_arch }}
-        archs: ${{ steps.extract_arch.outputs.oci_arch }}
         platforms: linux/${{ steps.extract_arch.outputs.oci_arch }}
         build-args: arch=${{ steps.extract_arch.outputs.rs_arch }}
         containerfiles: |
