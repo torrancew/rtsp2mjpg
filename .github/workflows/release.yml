@@ -89,6 +89,9 @@ jobs:
       with:
         name: rtsp2mjpg.${{ steps.extract_arch.outputs.rs_arch }}
         path: ./rtsp2mjpg.${{ steps.extract_arch.outputs.rs_arch }}
+    - name: Display Downloaded Archives
+      run: |
+        ls -R
     - name: Build Container
       id: build_image
       uses: redhat-actions/buildah-build@v2
@@ -127,6 +130,6 @@ jobs:
           type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
     - name: Download Per-Arch Container Images
       uses: actions/download-artifact@v3
-    - name: Display Downloaded Archites
+    - name: Display Downloaded Archives
       run: |
         ls -R
