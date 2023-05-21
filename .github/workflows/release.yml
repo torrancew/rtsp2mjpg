@@ -72,6 +72,7 @@ jobs:
       REGISTRY_USERNAME: ${{ github.actor }}
       REGISTRY_PASSWORD: ${{ github.token }}
     steps:
+    - uses: actions/checkout@v3
     - name: Extract Architecture Strings
       id: extract_arch
       run: |
