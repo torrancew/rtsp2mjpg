@@ -85,7 +85,7 @@ jobs:
         name: rtsp2mjpg-${{ steps.extract_arch.outputs.rs_arch }}
     - name: Build Container
       id: build_image
-      uses: redhat-actions/buildah-build
+      uses: redhat-actions/buildah-build@v2
       with:
         image: ${{ env.IMAGE_NAME }}
         tags: ${{ steps.extract_arch.outputs.oci_arch }}
