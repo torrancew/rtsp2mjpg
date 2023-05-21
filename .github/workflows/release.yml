@@ -54,23 +54,60 @@ jobs:
     - name: Upload Binaries
       uses: actions/upload-artifact@v3
       with:
-        name: rtsp2mjpg-${{ matrix.arch }}
+        name: rtsp2mjpg.${{ matrix.arch }}
         path: target/${{ env.TARGET }}/release/rtsp2mjpg
 
   container_images:
     name: Build Container Images
     runs-on: ubuntu-latest
+    needs: static_binaries
+    strategy:
+      matrix:
+        arch:
+          - amd64/x86_64
+          - arm64/aarch64
     env:
       IMAGE_NAME: ${{ github.repository }}
-      IMAGE_TAGS: latest ${{ github.ref_name }}
       IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
       REGISTRY_USERNAME: ${{ github.actor }}
       REGISTRY_PASSWORD: ${{ github.token }}
     steps:
-    - name: Install QEMU
-      uses: docker/setup-qemu-action@v2
-    - name: Install BuildX
-      uses: docker/setup-buildx-action@v2
+    - name: Extract Architecture Strings
+      id: extract_arch
+      run: |
+        OCI_ARCH=$(cut -d '/' -f1 <<<${{ matrix.arch }})
+        RS_ARCH=$( cut -d '/' -f2 <<<${{ matrix.arch }})
+        echo "oci_arch=${OCI_ARCH}" >>"$GITHUB_OUTPUT"
+        echo "rs_arch=${RS_ARCH}"   >>"$GITHUB_OUTPUT"
+    - name: Download Static Binary
+      uses: actions/download-artifact@v3
+      with:
+        name: rtsp2mjpg-${{ steps.extract_arch.outputs.rs_arch }}
+    - name: Build Container
+      id: build_image
+      uses: redhat-actions/buildah-build
+      with:
+        image: ${{ env.IMAGE_NAME }}
+        tags: ${{ steps.extract_arch.outputs.oci_arch }}
+        archs: ${{ steps.extract_arch.outputs.oci_arch }}
+        platforms: linux/${{ steps.extract_arch.outputs.oci_arch }}
+        build-args: arch=${{ steps.extract_arch.outputs.rs_arch }}
+        containerfiles: |
+          ./Containerfile
+    - name: Export Container
+      run: |
+        podman image save --quiet -o rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar ${{ steps.build_image.outputs.image-with-tag }
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar
+        path: ./rtsp2mjpg-${{ steps.extract_arch.outputs.oci_arch }}.tar
+
+  multiarch_image:
+    name: Build Static Executables
+    runs-on: ubuntu-latest
+    needs: container_images
+    steps:
     - id: metadata
       name: Configure Container Metadata
       uses: docker/metadata-action@v4
@@ -78,22 +115,15 @@ jobs:
         images: |
           ghcr.io/${{ env.IMAGE_NAME }}
         tags: |
+          type=sha
           type=ref,event=branch
           type=semver,pattern={{version}}
           type=semver,pattern={{major.minor}}
-          type=semver,pattern={{major}}
-          type=sha
-    - name: Authenticate to Registry
-      uses: docker/login-action@v2
+          type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+    - name: Download Per-Arch Container Images
+      uses: actions/download-artifact@v3
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ github.token }}
-    - name: Build Container
-      uses: docker/build-push-action@v4
-      with:
-        file: ./Containerfile
-        platforms: linux/amd64
-        push: ${{ github.ref_type == 'tag' }}
-        tags: ${{ steps.metadata.outputs.tags }}
-        labels: ${{ steps.metadata.output.labels }}
+        name: rtsp2mjpg-${{ steps.extract_arch.outputs.rs_arch }}
+    - name: Display Downloaded Archites
+      run: |
+        ls -R
