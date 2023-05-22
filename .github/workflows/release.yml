@@ -98,6 +98,8 @@ jobs:
         tags: ${{ steps.metadata.outputs.tags }}
         labels: ${{ steps.metadata.outputs.labels }}
         platforms: linux/${{ matrix.arch }}
+        extra-args: |
+          --isolation=chroot
         containerfiles: |
           ./Containerfile
     - name: Push to Registry
