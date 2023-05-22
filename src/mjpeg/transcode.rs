@@ -39,7 +39,6 @@ impl Process {
             .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
             .kill_on_drop(false)
             .spawn()?;
 
