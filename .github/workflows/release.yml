@@ -65,7 +65,6 @@ jobs:
 
   container_images:
     name: Build Container Images
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -75,6 +74,7 @@ jobs:
           runner: self-hosted
         - arch: arm64
           runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v3
     - id: metadata
