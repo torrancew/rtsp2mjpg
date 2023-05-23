@@ -43,6 +43,8 @@ impl Stream {
         let process = Process::new(
             "ffmpeg",
             [
+                "-rtsp_transport",
+                "tcp",
                 "-i",
                 source.as_ref(),
                 "-c:v",

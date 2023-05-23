@@ -9,4 +9,6 @@ FROM docker.io/library/alpine:3.17
 RUN apk add --no-cache ffmpeg
 COPY --from=builder /usr/local/cargo/bin/rtsp2mjpg /usr/local/bin/rtsp2mjpg
 
+EXPOSE 3000
+
 ENTRYPOINT ["/usr/local/bin/rtsp2mjpg"]
