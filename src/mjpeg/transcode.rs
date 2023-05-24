@@ -45,6 +45,8 @@ impl Process {
             .stdout(Stdio::piped())
             .kill_on_drop(true)
             .args([
+                "-rtsp_transport",
+                "tcp",
                 "-i",
                 source.as_ref(),
                 "-c:v",
