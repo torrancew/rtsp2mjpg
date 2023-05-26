@@ -118,8 +118,8 @@ jobs:
     steps:
     - name: Install Buildah and Podman
       run: |
-        apt-get update
-        apt-get install -y buildah podman
+        sudo apt-get update
+        sudo apt-get install -y buildah podman
     - id: metadata
       name: Configure Container Metadata
       uses: docker/metadata-action@v4

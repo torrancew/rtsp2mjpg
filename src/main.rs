@@ -4,7 +4,7 @@ use mjpeg::Process;
 use std::sync::Arc;
 
 use async_stream::stream;
-use axum::{extract::State, response::IntoResponse, routing::get, Router, Server};
+use axum::{extract::State, response::IntoResponse, routing, Router, Server};
 use bytes::Bytes;
 use clap::Parser;
 use tracing::info;
@@ -43,7 +43,7 @@ struct Args {
     stream: String,
 }
 
-async fn stream(State(stream): State<Arc<Process>>) -> impl IntoResponse {
+async fn handler(State(stream): State<Arc<Process>>) -> impl IntoResponse {
     use axum::{
         body::StreamBody,
         http::{header, StatusCode},
@@ -74,12 +74,13 @@ async fn stream(State(stream): State<Arc<Process>>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Configure logging to stdout via `tracing`
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
     let transcoder = Arc::new(Process::new(args.stream, args.fps, args.buffer)?);
     let app = Router::new()
-        .route("/", get(stream))
+        .route("/", routing::get(handler))
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(transcoder);
 
