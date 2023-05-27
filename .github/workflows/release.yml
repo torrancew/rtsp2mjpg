@@ -134,14 +134,12 @@ jobs:
           type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
     - name: Tag Container
       env:
-        IMAGE_ID: ghcr.io/${{ env.IMAGE_NAME }}:${{ fromJSON(steps.metadata.outputs.json).tags[0] }}
+        IMAGE_ID: ${{ fromJSON(steps.metadata.outputs.json).tags[0] }}
       run: |
         buildah manifest create ${{ env.IMAGE_NAME }}
         buildah manifest add ${{ env.IMAGE_NAME }} ${{ env.IMAGE_ID }}-amd64
         buildah manifest add ${{ env.IMAGE_NAME }} ${{ env.IMAGE_ID }}-arm64
-        for tag in ${{ steps.metadata.outputs.tags }}; do
-          buildah tag ${{ env.IMAGE_NAME }} ghcr.io/${{ env.IMAGE_NAME }}:$tag
-        done
+        buildah tag ${{ env.IMAGE_NAME }} ${{ steps.metadata.outputs.tags }}
     - name: Push to Registry
       uses: redhat-actions/push-to-registry@v2
       with:
