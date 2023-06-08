@@ -77,7 +77,7 @@ impl Process {
 
             // Enter the streaming loop
             // TODO: add a configurable timeout to handle upstream streams disappearing
-            // TODO: halt the stream upon receipt of a signal from stopper
+            // TODO: halt the stream if the child process fails
             loop {
                 match reader.read_frame().await {
                     Err(FrameError::Corrupt) => continue,

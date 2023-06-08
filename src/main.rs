@@ -9,6 +9,8 @@ use bytes::Bytes;
 use clap::Parser;
 use tracing::info;
 
+const CONTENT_TYPE: &str = "multipart/x-mixed-replace; boundary=ffmpeg";
+
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -53,13 +55,14 @@ async fn handler(State(stream): State<Arc<Process>>) -> impl IntoResponse {
     (
         StatusCode::OK,
         [
-            (
-                header::CONTENT_TYPE,
-                "multipart/x-mixed-replace; boundary=ffmpeg",
-            ),
+            (header::CONTENT_TYPE, CONTENT_TYPE),
             (header::CACHE_CONTROL, "no-cache"),
         ],
         StreamBody::new(stream! {
+            // Inject the first MIME delimiter.
+            // These come at the END of frames,
+            // but also need to separate the
+            // status code and the first frame
             yield Ok(Bytes::from("--ffmpeg\r\n"));
 
             loop {
