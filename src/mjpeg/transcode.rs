@@ -1,6 +1,6 @@
 use super::{
     frame::{Frame, FrameError, FrameReader},
-    Stream,
+    Stream, Transcoder,
 };
 
 use std::{io, process::Stdio};
@@ -96,8 +96,21 @@ impl Process {
             process,
         })
     }
+}
 
-    pub fn subscribe(&self) -> Stream {
+impl Transcoder for Process {
+    type Error = ProcessError;
+    type Output = Stream;
+
+    fn start(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn stop(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn subscribe(&self) -> Self::Output {
         Stream(self.channel.subscribe())
     }
 }

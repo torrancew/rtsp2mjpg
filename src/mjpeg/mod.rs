@@ -1,10 +1,14 @@
 mod frame;
 use frame::Frame;
 
+mod traits;
+pub(crate) use traits::*;
+
 mod transcode;
 pub(crate) use transcode::Process;
-use transcode::ProcessError;
+pub(crate) use transcode::ProcessError;
 
+use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::broadcast::{error::RecvError, Receiver};
 
@@ -18,8 +22,11 @@ pub(crate) enum StreamError {
 
 pub(crate) struct Stream(Receiver<Frame>);
 
-impl Stream {
-    pub async fn next_frame(&mut self) -> Result<Frame, StreamError> {
+#[async_trait]
+impl FrameStreamer for Stream {
+    type Error = StreamError;
+
+    async fn next_frame(&mut self) -> Result<Frame, Self::Error> {
         self.0.recv().await.map_err(StreamError::from)
     }
 }
