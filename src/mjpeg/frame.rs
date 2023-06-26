@@ -25,11 +25,11 @@ impl From<ParseIntError> for FrameError {
 }
 
 pub trait TryBool {
-    fn as_result(&self) -> Result<(), ()>;
+    fn ok(&self) -> Result<(), ()>;
 }
 
 impl TryBool for bool {
-    fn as_result(&self) -> Result<(), ()> {
+    fn ok(&self) -> Result<(), ()> {
         self.then_some(()).ok_or(())
     }
 }
@@ -54,20 +54,17 @@ impl<R: AsyncRead + Unpin> FrameReader<R> {
         self.read_line()
             .await?
             .starts_with("--ffmpeg")
-            .as_result()
+            .ok()
             .map_err(FrameError::from)
     }
 
     pub async fn read_frame(&mut self) -> Result<Frame, FrameError> {
         // Read the Content-type header, which ffmpeg emits first
-        self.read_line()
-            .await?
-            .starts_with("Content-type:")
-            .as_result()?;
+        self.read_line().await?.starts_with("Content-type:").ok()?;
 
         // Capture the Content-length header, which ffmpeg emits second
         let len_hdr = self.read_line().await?;
-        len_hdr.starts_with("Content-length:").as_result()?;
+        len_hdr.starts_with("Content-length:").ok()?;
 
         // Parse content length
         let len_str = len_hdr
@@ -77,20 +74,20 @@ impl<R: AsyncRead + Unpin> FrameReader<R> {
         let content_length = len_str.parse::<usize>()?;
 
         // Discard the trailing empty line
-        (self.read_line().await?.trim() == "").as_result()?;
+        (self.read_line().await?.trim() == "").ok()?;
 
         // Read data payload
         let data = self.read_bytes(content_length).await?;
 
         // Ensure data is the correct length
-        (data.len() == content_length).as_result()?;
+        (data.len() == content_length).ok()?;
 
         // Discard the trailing empty line
-        (self.read_line().await?.trim() == "").as_result()?;
+        (self.read_line().await?.trim() == "").ok()?;
 
         // Discard the MIME boundary and emit the frame
         let boundary = self.read_line().await?;
-        boundary.starts_with("--ffmpeg").as_result()?;
+        boundary.starts_with("--ffmpeg").ok()?;
 
         // Repack the frame
         let mut buf = BytesMut::with_capacity(256 * 1024);
