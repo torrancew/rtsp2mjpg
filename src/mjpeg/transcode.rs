@@ -5,9 +5,9 @@ use super::{
 
 use std::{io, process::Stdio};
 
+use async_process::{Child, Command};
 use thiserror::Error;
 use tokio::{
-    process::{Child, Command},
     sync::broadcast::{error::SendError, Sender},
     task::JoinHandle,
 };

@@ -1,8 +1,8 @@
 use std::{io, num::ParseIntError};
 
 use bytes::{Bytes, BytesMut};
+use futures_lite::io::{AsyncRead, BufReader};
 use thiserror::Error;
-use tokio::io::{AsyncRead, BufReader};
 
 #[derive(Debug, Error)]
 pub enum FrameError {
@@ -104,13 +104,13 @@ impl<R: AsyncRead + Unpin> FrameReader<R> {
     }
 
     async fn read_bytes(&mut self, count: usize) -> Result<Bytes, FrameError> {
-        use tokio::io::AsyncReadExt;
+        use futures_lite::io::AsyncReadExt;
         let mut buf = BytesMut::zeroed(count);
         Ok(self.0.read_exact(&mut buf).await.map(|_| buf.freeze())?)
     }
 
     async fn read_line(&mut self) -> Result<String, FrameError> {
-        use tokio::io::AsyncBufReadExt;
+        use futures_lite::io::AsyncBufReadExt;
         let mut line = String::new();
         Ok(self.0.read_line(&mut line).await.map(|_| line)?)
     }
