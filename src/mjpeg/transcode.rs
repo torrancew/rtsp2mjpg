@@ -5,17 +5,15 @@ use super::{
 
 use std::{io, process::Stdio};
 
+use async_broadcast::{InactiveReceiver, Sender, TrySendError};
 use async_process::{Child, Command};
 use thiserror::Error;
-use tokio::{
-    sync::broadcast::{error::SendError, Sender},
-    task::JoinHandle,
-};
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Error)]
 pub(crate) enum ProcessError {
-    #[error("xmit error: {0}")]
-    Channel(#[from] SendError<Frame>),
+    #[error("channel is closed")]
+    Channel,
     #[error("frame error: {0}")]
     Frame(#[from] FrameError),
     #[error("i/o error: {0}")]
@@ -25,7 +23,9 @@ pub(crate) enum ProcessError {
 }
 
 pub(crate) struct Process {
-    channel: Sender<Frame>,
+    transmitter: Sender<Frame>,
+    #[allow(dead_code)]
+    receiver: InactiveReceiver<Frame>,
     #[allow(dead_code)]
     handle: JoinHandle<Result<(), ProcessError>>,
     #[allow(dead_code)]
@@ -39,7 +39,10 @@ impl Process {
         buffer_secs: usize,
     ) -> Result<Self, ProcessError> {
         let buffered_frames = fps * buffer_secs;
-        let (channel, _) = tokio::sync::broadcast::channel(buffered_frames);
+        let (mut tx, rx) = async_broadcast::broadcast(buffered_frames);
+        tx.set_overflow(true);
+        tx.set_await_active(false);
+
         let mut process = Command::new("ffmpeg")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -70,7 +73,7 @@ impl Process {
             .ok_or(ProcessError::Pipe)
             .map(FrameReader::new)?;
 
-        let tx = channel.clone();
+        let channel = tx.clone();
         let handle = tokio::spawn(async move {
             // Discard the leading MIME boundary before looping over the incoming frames
             reader.discard_mime_boundary().await?;
@@ -80,18 +83,19 @@ impl Process {
             // TODO: halt the stream if the child process fails
             loop {
                 match reader.read_frame().await {
+                    Ok(frame) => match channel.try_broadcast(frame) {
+                        Err(TrySendError::Closed(_)) => return Err(ProcessError::Channel),
+                        _ => continue,
+                    },
                     Err(FrameError::Corrupt) => continue,
-                    Ok(frame) => {
-                        let _ = tx.send(frame);
-                        continue;
-                    }
                     Err(e) => return Err(ProcessError::from(e)),
                 }
             }
         });
 
         Ok(Self {
-            channel,
+            transmitter: tx,
+            receiver: rx.deactivate(),
             handle,
             process,
         })
@@ -111,6 +115,6 @@ impl Transcoder for Process {
     }
 
     fn subscribe(&self) -> Self::Output {
-        Stream(self.channel.subscribe())
+        Stream(self.transmitter.new_receiver())
     }
 }

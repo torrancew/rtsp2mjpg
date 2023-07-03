@@ -8,9 +8,9 @@ mod transcode;
 pub(crate) use transcode::Process;
 pub(crate) use transcode::ProcessError;
 
+use async_broadcast::{Receiver, RecvError};
 use async_trait::async_trait;
 use thiserror::Error;
-use tokio::sync::broadcast::{error::RecvError, Receiver};
 
 #[derive(Debug, Error)]
 pub(crate) enum StreamError {
@@ -27,6 +27,14 @@ impl FrameStreamer for Stream {
     type Error = StreamError;
 
     async fn next_frame(&mut self) -> Result<Frame, Self::Error> {
-        self.0.recv().await.map_err(StreamError::from)
+        loop {
+            match self.0.recv().await {
+                Ok(frame) => return Ok(frame),
+                Err(e) => match e {
+                    RecvError::Overflowed(_) => continue,
+                    _ => return Err(StreamError::from(e)),
+                },
+            }
+        }
     }
 }
