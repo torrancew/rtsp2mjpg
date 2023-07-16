@@ -1,5 +1,5 @@
 use super::{
-    frame::{Frame, FrameError, FrameReader},
+    frame::{DeadStream, Frame, FrameReader},
     Stream, Transcoder,
 };
 
@@ -14,8 +14,6 @@ use tokio::task::JoinHandle;
 pub(crate) enum ProcessError {
     #[error("channel is closed")]
     Channel,
-    #[error("frame error: {0}")]
-    Frame(#[from] FrameError),
     #[error("i/o error: {0}")]
     Io(#[from] io::Error),
     #[error("pipe error")]
@@ -23,9 +21,9 @@ pub(crate) enum ProcessError {
 }
 
 pub(crate) struct Process {
-    transmitter: Sender<Frame>,
+    transmitter: Sender<Result<Frame, DeadStream>>,
     #[allow(dead_code)]
-    receiver: InactiveReceiver<Frame>,
+    receiver: InactiveReceiver<Result<Frame, DeadStream>>,
     #[allow(dead_code)]
     handle: JoinHandle<Result<(), ProcessError>>,
     #[allow(dead_code)]
@@ -76,19 +74,20 @@ impl Process {
         let channel = tx.clone();
         let handle = tokio::spawn(async move {
             // Discard the leading MIME boundary before looping over the incoming frames
-            reader.discard_mime_boundary().await?;
+            let _ = reader.discard_mime_boundary().await?;
 
             // Enter the streaming loop
             // TODO: add a configurable timeout to handle upstream streams disappearing
             // TODO: halt the stream if the child process fails
             loop {
-                match reader.read_frame().await {
-                    Ok(frame) => match channel.try_broadcast(frame) {
-                        Err(TrySendError::Closed(_)) => return Err(ProcessError::Channel),
-                        _ => continue,
-                    },
-                    Err(FrameError::Corrupt) => continue,
-                    Err(e) => return Err(ProcessError::from(e)),
+                let frame_result = match reader.read_frame().await {
+                    Ok(None) => continue,
+                    Ok(Some(frame)) => Ok(frame),
+                    Err(e) => Err(e),
+                };
+
+                if let Err(TrySendError::Closed(_)) = channel.try_broadcast(frame_result) {
+                    break Err(ProcessError::Channel);
                 }
             }
         });

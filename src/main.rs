@@ -49,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     let transcoder = Process::new(args.stream, args.fps, args.buffer)?;
     let server = Server::new((args.listen_addr, args.port), transcoder).await?;
 
-    server.await?;
+    server.listen().await?;
 
     Ok(())
 }

@@ -1,23 +1,18 @@
-use crate::mjpeg::{FrameStreamer, Transcoder};
+use crate::mjpeg::{Process, Transcoder};
 
-use std::{future::Future, io, sync::Arc};
+use std::{io, sync::Arc};
 
-use async_stream::stream;
-use axum::{extract::State, response::IntoResponse, routing, Router};
-use bytes::Bytes;
-use pin_project_lite::pin_project;
+use async_net::{resolve, AsyncToSocketAddrs};
+use futures::{io::Cursor, AsyncReadExt, TryStreamExt};
 use thiserror::Error;
-use tokio::net::{lookup_host, ToSocketAddrs};
+use tide::{http::mime, Body, Request, Response};
 use tracing::info;
 
-type AxumServer = axum::Server<hyper::server::conn::AddrIncoming, routing::IntoMakeService<Router>>;
-
 const CONTENT_TYPE: &str = "multipart/x-mixed-replace; boundary=ffmpeg";
+const PREAMBLE: &[u8] = b"--ffmpeg\r\n";
 
 #[derive(Debug, Error)]
 pub enum ServerError {
-    #[error("hyper error: {0}")]
-    Hyper(#[from] hyper::Error),
     #[error("invalid bind address")]
     InvalidAddr,
     #[error("i/o error: {0}")]
@@ -30,81 +25,43 @@ impl From<()> for ServerError {
     }
 }
 
-pin_project! {
-    pub(crate) struct Server {
-        #[pin]
-        inner: AxumServer,
-    }
+pub(crate) struct Server<A: AsyncToSocketAddrs> {
+    server: tide::Server<Arc<Process>>,
+    addr: A,
 }
 
-// `axum::Server` implements Future, and we want to expose that interface
-impl Future for Server {
-    type Output = Result<(), ServerError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        Future::poll(self.project().inner, cx).map_err(ServerError::from)
-    }
-}
-
-impl Server {
-    pub async fn new<A, T: Transcoder + Send + Sync + 'static>(
-        addr: A,
-        state: T,
-    ) -> Result<Self, ServerError>
+impl<A: AsyncToSocketAddrs> Server<A> {
+    pub async fn new(addr: A, state: Process) -> Result<Self, ServerError>
     where
-        A: ToSocketAddrs,
-        <T as Transcoder>::Output: Send + 'static,
+        A: AsyncToSocketAddrs,
     {
-        use axum::Server;
+        let mut server = tide::Server::with_state(Arc::new(state));
+        server.with(tide_tracing::TraceMiddleware);
+        server.at("/").get(handler);
 
-        let addr = lookup_host(addr).await?.next().ok_or(())?;
-        info!("Listening on {addr}");
+        Ok(Self { server, addr })
+    }
 
-        let app = Router::new()
-            .route("/", routing::get(handler))
-            .layer(tower_http::trace::TraceLayer::new_for_http())
-            .with_state(Arc::new(state));
-
-        Ok(Server::try_bind(&addr).map(|b| Self {
-            inner: b.serve(app.into_make_service()),
-        })?)
+    pub async fn listen(self) -> Result<(), ServerError> {
+        let addr = resolve(self.addr)
+            .await?
+            .into_iter()
+            .next()
+            .ok_or(ServerError::InvalidAddr)?;
+        Ok(self.server.listen(addr).await?)
     }
 }
 
-async fn handler<T>(State(stream): State<Arc<T>>) -> impl IntoResponse
-where
-    T: Transcoder,
-    <T as Transcoder>::Output: Send + 'static,
-{
-    use axum::{
-        body::StreamBody,
-        http::{header, StatusCode},
-    };
-
+async fn handler(req: Request<Arc<Process>>) -> tide::Result {
     info!("subscribing to stream for new incoming connection");
-    let mut stream = stream.subscribe();
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, CONTENT_TYPE),
-            (header::CACHE_CONTROL, "no-cache"),
-        ],
-        StreamBody::new(stream! {
-            // Inject the first MIME delimiter.
-            // These come at the end of frames,
-            // but also need to separate the
-            // status code and the first frame
-            yield Ok(Bytes::from("--ffmpeg\r\n"));
+    let stream = req.state().subscribe();
 
-            loop {
-                match stream.next_frame().await {
-                    Err(_) => continue,
-                    x => yield x.map(Bytes::from),
-                }
-            }
-        }),
-    )
+    Ok(Response::builder(200)
+        .header("CACHE_CONTROL", "no-cache")
+        .content_type(mime::Mime::from(CONTENT_TYPE))
+        .body(Body::from_reader(
+            Cursor::new(PREAMBLE).chain(stream.into_async_read()),
+            None,
+        ))
+        .build())
 }

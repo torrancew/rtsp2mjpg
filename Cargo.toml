@@ -6,18 +6,17 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 async-broadcast = "0.5.1"
+async-net = "1.7.0"
 async-process = "1.7.0"
-async-stream = "0.3.5"
 async-trait = "0.1.68"
-axum = "0.6.18"
 bytes = "1.4.0"
 clap = { version = "4.2.7", features = ["derive"] }
-futures-lite = "1.13.0"
-hyper = { version = "0.14.26", features = ["full"] }
-pin-project-lite = "0.2.9"
+futures = "0.3.28"
+pin-project = "1.1.2"
 thiserror = "1.0.40"
+tide = { version = "0.16.0", default-features = false, features = ["h1-server"] }
+tide-tracing = "0.0.12"
 tokio = { version = "1.28.1", features = ["full"] }
-tower-http = { version = "0.4.0", features = ["trace"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 
