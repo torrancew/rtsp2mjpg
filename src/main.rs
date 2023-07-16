@@ -40,16 +40,17 @@ struct Args {
     stream: String,
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     // Configure logging to stdout via `tracing`
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
     let transcoder = Process::new(args.stream, args.fps, args.buffer)?;
-    let server = Server::new((args.listen_addr, args.port), transcoder).await?;
 
-    server.listen().await?;
+    smol::block_on(async move {
+        let server = Server::new((args.listen_addr, args.port), transcoder).await?;
+        server.listen().await?;
 
-    Ok(())
+        Ok(())
+    })
 }

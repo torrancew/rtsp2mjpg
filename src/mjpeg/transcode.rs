@@ -7,8 +7,8 @@ use std::{io, process::Stdio};
 
 use async_broadcast::{InactiveReceiver, Sender, TrySendError};
 use async_process::{Child, Command};
+use smol::Task;
 use thiserror::Error;
-use tokio::task::JoinHandle;
 
 #[derive(Debug, Error)]
 pub(crate) enum ProcessError {
@@ -25,7 +25,7 @@ pub(crate) struct Process {
     #[allow(dead_code)]
     receiver: InactiveReceiver<Result<Frame, DeadStream>>,
     #[allow(dead_code)]
-    handle: JoinHandle<Result<(), ProcessError>>,
+    handle: Task<Result<(), ProcessError>>,
     #[allow(dead_code)]
     process: Child,
 }
@@ -72,7 +72,7 @@ impl Process {
             .map(FrameReader::new)?;
 
         let channel = tx.clone();
-        let handle = tokio::spawn(async move {
+        let handle = smol::spawn(async move {
             // Discard the leading MIME boundary before looping over the incoming frames
             let _ = reader.discard_mime_boundary().await?;
 
